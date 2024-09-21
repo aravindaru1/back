@@ -25,7 +25,7 @@ const encodeImageUrl = (url) => {
   const cipher = crypto.createCipheriv(ALGO, ENCRYPTION_KEY, iv);
   let encryptedUrl = cipher.update(url, 'utf8', 'base64');
   encryptedUrl += cipher.final('base64');
-  return https://ournewsapi.vercel.app/image-urls?url=${encodeURIComponent(${iv.toString('hex')}:${encryptedUrl})};
+  return `https://ournewsapi.vercel.app/image-urls?url=${encodeURIComponent(`${iv.toString('hex')}:${encryptedUrl}`)}`;
 };
 
 const decodeImageUrl = (encryptedUrl) => {
@@ -41,7 +41,7 @@ const encryptJsonResponse = (json) => {
   const cipher = crypto.createCipheriv(ALGO, ENCRYPTION_KEY, iv);
   let encryptedJson = cipher.update(JSON.stringify(json), 'utf8', 'base64');
   encryptedJson += cipher.final('base64');
-  return ${iv.toString('hex')}:${encryptedJson};
+  return `${iv.toString('hex')}:${encryptedJson}`;
 };
 
 const rewriteUsingGroq = async (text, prompt) => {
@@ -50,7 +50,7 @@ const rewriteUsingGroq = async (text, prompt) => {
       messages: [
         {
           role: "user",
-          content: ${prompt} "${text}". Provide as detailed a response as possible.
+          content: `${prompt} "${text}". Provide as detailed a response as possible.`
         }
       ],
       model: "llama3-8b-8192"
@@ -68,7 +68,7 @@ const summarizeUsingGroq = async (titles) => {
       messages: [
         {
           role: "user",
-          content: Rewrite the following titles concisely and provide only the rewritten titles with detailed and without introduction, separated by line breaks. Titles: ${titles.join("; ")}
+          content: `Rewrite the following titles concisely and provide only the rewritten titles with detailed and without introduction, separated by line breaks. Titles: ${titles.join("; ")}`
         }
       ],
       model: "llama-3.1-8b-instant"
@@ -83,7 +83,7 @@ const summarizeUsingGroq = async (titles) => {
 
 const fetchNewsData = async () => {
   try {
-    const url = ${API_URL_BASE}&cache_bust=${Date.now()};
+    const url = `${API_URL_BASE}&cache_bust=${Date.now()}`;
     const response = await axios.get(url, { headers: { 'Cache-Control': 'no-store' } });
     const newsList = response.data.data.news_list;
     const minNewsId = response.data.data.min_news_id;
@@ -127,14 +127,14 @@ const getMoreNews = async (req, res) => {
   try {
     const minNewsId = req.body.minNewsId;
     if (!minNewsId) return res.status(400).send('minNewsId is required');
-    const cacheKey = news_more_${minNewsId};
+    const cacheKey = `news_more_${minNewsId}`;
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
       const encryptedResponse = encryptJsonResponse(cachedData);
       return res.json({ encryptedData: encryptedResponse });
     }
 
-    const url = ${API_URL_BASE}&news_offset=${minNewsId}&cache_bust=${Date.now()};
+    const url = `${API_URL_BASE}&news_offset=${minNewsId}&cache_bust=${Date.now()}`;
     const response = await axios.get(url, { headers: { 'Cache-Control': 'no-store' } });
     const newsList = response.data.data.news_list;
     const newMinNewsId = response.data.data.min_news_id;
@@ -224,5 +224,5 @@ app.post('/news-more', getMoreNews);
 app.post('/summarize', summarizeArticle);
 
 app.listen(PORT, () => {
-//   console.log(Server is running on port ${PORT});
+//   console.log(`Server is running on port ${PORT}`);
 });
