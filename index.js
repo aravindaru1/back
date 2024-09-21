@@ -57,7 +57,6 @@ const rewriteUsingGroq = async (text, prompt) => {
     });
     return chatCompletion.choices[0]?.message?.content.trim() || '';
   } catch (error) {
-    // console.error('Error rewriting using Groq:', error);
     throw error;
   }
 };
@@ -76,7 +75,6 @@ const summarizeUsingGroq = async (titles) => {
     const completionContent = chatCompletion.choices[0]?.message?.content.trim() || '';
     return completionContent.split('\n').map(title => title.trim());
   } catch (error) {
-    // console.error('Error summarizing using Groq:', error);
     throw error;
   }
 };
@@ -87,20 +85,42 @@ const fetchNewsData = async () => {
     const response = await axios.get(url, { headers: { 'Cache-Control': 'no-store' } });
     const newsList = response.data.data.news_list;
     const minNewsId = response.data.data.min_news_id;
+
+    // Extract the titles from the news list
     const titles = newsList.map(news => news.news_obj.title);
+
+    // Rewrite the titles using Groq
     const rewrittenTitles = await summarizeUsingGroq(titles);
-    newsData = newsList.map((news, index) => ({
+
+    // Ensure the number of rewritten titles matches the number of original titles
+    if (rewrittenTitles.length !== titles.length) {
+      console.error('Mismatch between original and rewritten titles count.');
+      return newsList.map((news, index) => ({
+        index,
+        title: titles[index], // Fallback to original title if there is an error
+        content: news.news_obj.content,
+        imageUrl: encodeImageUrl(news.news_obj.image_url),
+        minNewsId,
+        hashId: news.news_obj.hash_id,
+        sourceUrl: news.news_obj.source_url
+      }));
+    }
+
+    // Map rewritten titles back to their respective fields
+    const newsData = newsList.map((news, index) => ({
       index,
-      title: rewrittenTitles[index] || news.news_obj.title,
+      title: rewrittenTitles[index], // Properly map rewritten title
       content: news.news_obj.content,
       imageUrl: encodeImageUrl(news.news_obj.image_url),
       minNewsId,
       hashId: news.news_obj.hash_id,
       sourceUrl: news.news_obj.source_url
     }));
+
+    // Cache the result
     cache.set('news_data', newsData);
   } catch (error) {
-    // console.error('Error fetching news data:', error);
+    console.error('Error fetching news data:', error);
     newsData = [];
   }
 };
@@ -118,7 +138,6 @@ const getNews = (req, res) => {
       });
     }
   } catch (error) {
-    // console.error('Error sending news data:', error);
     res.status(500).json({ error: 'Failed to send data' });
   }
 };
@@ -141,9 +160,22 @@ const getMoreNews = async (req, res) => {
     const titles = newsList.map(news => news.news_obj.title);
     const rewrittenTitles = await summarizeUsingGroq(titles);
 
+    if (rewrittenTitles.length !== titles.length) {
+      console.error('Mismatch between original and rewritten titles count.');
+      return newsList.map((news, index) => ({
+        index,
+        title: titles[index], // Fallback to original title if there is an error
+        content: news.news_obj.content,
+        imageUrl: encodeImageUrl(news.news_obj.image_url),
+        minNewsId: newMinNewsId,
+        hashId: news.news_obj.hash_id,
+        sourceUrl: news.news_obj.source_url
+      }));
+    }
+
     const newsMoreData = newsList.map((news, index) => ({
       index,
-      title: rewrittenTitles[index] || news.news_obj.title,
+      title: rewrittenTitles[index],
       content: news.news_obj.content,
       imageUrl: encodeImageUrl(news.news_obj.image_url),
       minNewsId: newMinNewsId,
@@ -155,7 +187,6 @@ const getMoreNews = async (req, res) => {
     const encryptedResponse = encryptJsonResponse(newsMoreData);
     res.json({ encryptedData: encryptedResponse });
   } catch (error) {
-    // console.error('Error fetching more news:', error);
     res.status(500).json({ error: 'Failed to send data' });
   }
 };
@@ -176,7 +207,6 @@ const summarizeArticle = async (req, res) => {
     const response = await axios(options);
     const { full_text, title, img_url, summary } = response.data;
 
-    // Check if fullText or Title is empty or null
     if (!full_text || !title) {
       const errorMessage = { Title: 'There is no data available', fullText: 'There is no data available', imageUrl: '', summary: 'There is no data available' };
       const encryptedResponse = encryptJsonResponse(errorMessage);
@@ -196,33 +226,24 @@ const summarizeArticle = async (req, res) => {
     const encryptedResponse = encryptJsonResponse(articleData);
     res.json({ encryptedData: encryptedResponse });
   } catch (error) {
-    // console.error('Error summarizing article:', error);
     res.status(500).json({ error: 'Failed to summarize article' });
   }
 };
 
-app.get('/image-urls', async (req, res) => {
+app.get('/image-urls', (req, res) => {
   try {
-    const encodedUrl = req.query.url;
-    const url = decodeImageUrl(encodedUrl);
-    const response = await axios({
-      url,
-      method: 'GET',
-      responseType: 'stream'
-    });
-
-    res.setHeader('Content-Type', response.headers['content-type']);
-    response.data.pipe(res);
+    const { url } = req.query;
+    const decodedUrl = decodeImageUrl(url);
+    res.redirect(decodedUrl);
   } catch (error) {
-    // console.error('Error fetching the image:', error);
-    res.status(500).send('Error fetching the image');
+    res.status(500).send('Error decoding image URL');
   }
 });
 
 app.get('/news', getNews);
 app.post('/news-more', getMoreNews);
-app.post('/summarize', summarizeArticle);
+app.post('/summarize-article', summarizeArticle);
 
 app.listen(PORT, () => {
-//   console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
