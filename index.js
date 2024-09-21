@@ -88,8 +88,11 @@ const fetchNewsData = async () => {
     const newsList = response.data.data.news_list;
     const minNewsId = response.data.data.min_news_id;
     const titles = newsList.map(news => news.news_obj.title);
-    const rewrittenTitles = await summarizeUsingGroq(titles);
-    newsData = newsList.map((news, index) => ({
+
+    // Rewrite titles in parallel
+    const rewrittenTitles = await Promise.all(titles.map(title => rewriteUsingGroq(title, "Rewrite the following title concisely and provide only the rewritten title with detailed and without introduction: ")));
+
+    const newsData = newsList.map((news, index) => ({
       index,
       title: rewrittenTitles[index] || news.news_obj.title,
       content: news.news_obj.content,
@@ -98,6 +101,7 @@ const fetchNewsData = async () => {
       hashId: news.news_obj.hash_id,
       sourceUrl: news.news_obj.source_url
     }));
+
     cache.set('news_data', newsData);
   } catch (error) {
     // console.error('Error fetching news data:', error);
@@ -139,7 +143,9 @@ const getMoreNews = async (req, res) => {
     const newsList = response.data.data.news_list;
     const newMinNewsId = response.data.data.min_news_id;
     const titles = newsList.map(news => news.news_obj.title);
-    const rewrittenTitles = await summarizeUsingGroq(titles);
+
+    // Rewrite titles in parallel
+    const rewrittenTitles = await Promise.all(titles.map(title => rewriteUsingGroq(title, "Rewrite the following title concisely and provide only the rewritten title with detailed and without introduction: ")));
 
     const newsMoreData = newsList.map((news, index) => ({
       index,
@@ -183,8 +189,10 @@ const summarizeArticle = async (req, res) => {
       return res.json({ encryptedData: encryptedResponse });
     }
 
-    const rewrittenText = await rewriteUsingGroq(full_text, "Rewrite the following text and as big response as possible and as detailed text as possible: ");
-    const rewrittenTitle = await rewriteUsingGroq(title, "Rewrite the following title with only one option and single title, Don't give multiple titles and without any explanation and as detailed title as possible: ");
+    const [rewrittenText, rewrittenTitle] = await Promise.all([
+      rewriteUsingGroq(full_text, "Rewrite the following text and as big response as possible and as detailed text as possible: "),
+      rewriteUsingGroq(title, "Rewrite the following title with only one option and single title, Don't give multiple titles and without any explanation and as detailed title as possible: ")
+    ]);
 
     const articleData = {
       Title: rewrittenTitle,
