@@ -25,7 +25,7 @@ const encodeImageUrl = (url) => {
   const cipher = crypto.createCipheriv(ALGO, ENCRYPTION_KEY, iv);
   let encryptedUrl = cipher.update(url, 'utf8', 'base64');
   encryptedUrl += cipher.final('base64');
-  return `https://ournewsapi.vercel.app/image-urls?url=${encodeURIComponent(`${iv.toString('hex')}:${encryptedUrl}`)}`;
+  return https://ournewsapi.vercel.app/image-urls?url=${encodeURIComponent(${iv.toString('hex')}:${encryptedUrl})};
 };
 
 const decodeImageUrl = (encryptedUrl) => {
@@ -41,7 +41,7 @@ const encryptJsonResponse = (json) => {
   const cipher = crypto.createCipheriv(ALGO, ENCRYPTION_KEY, iv);
   let encryptedJson = cipher.update(JSON.stringify(json), 'utf8', 'base64');
   encryptedJson += cipher.final('base64');
-  return `${iv.toString('hex')}:${encryptedJson}`;
+  return ${iv.toString('hex')}:${encryptedJson};
 };
 
 const rewriteUsingGroq = async (text, prompt) => {
@@ -50,13 +50,14 @@ const rewriteUsingGroq = async (text, prompt) => {
       messages: [
         {
           role: "user",
-          content: `${prompt} "${text}". Provide as detailed a response as possible.`
+          content: ${prompt} "${text}". Provide as detailed a response as possible.
         }
       ],
       model: "llama3-8b-8192"
     });
     return chatCompletion.choices[0]?.message?.content.trim() || '';
   } catch (error) {
+    // console.error('Error rewriting using Groq:', error);
     throw error;
   }
 };
@@ -67,7 +68,7 @@ const summarizeUsingGroq = async (titles) => {
       messages: [
         {
           role: "user",
-          content: `Rewrite the following titles concisely and provide only the rewritten titles with detailed and without introduction, separated by line breaks. Titles: ${titles.join("; ")}`
+          content: Rewrite the following titles concisely and provide only the rewritten titles with detailed and without introduction, separated by line breaks. Titles: ${titles.join("; ")}
         }
       ],
       model: "llama-3.1-8b-instant"
@@ -75,52 +76,31 @@ const summarizeUsingGroq = async (titles) => {
     const completionContent = chatCompletion.choices[0]?.message?.content.trim() || '';
     return completionContent.split('\n').map(title => title.trim());
   } catch (error) {
+    // console.error('Error summarizing using Groq:', error);
     throw error;
   }
 };
 
 const fetchNewsData = async () => {
   try {
-    const url = `${API_URL_BASE}&cache_bust=${Date.now()}`;
+    const url = ${API_URL_BASE}&cache_bust=${Date.now()};
     const response = await axios.get(url, { headers: { 'Cache-Control': 'no-store' } });
     const newsList = response.data.data.news_list;
     const minNewsId = response.data.data.min_news_id;
-
-    // Extract the titles from the news list
     const titles = newsList.map(news => news.news_obj.title);
-
-    // Rewrite the titles using Groq
     const rewrittenTitles = await summarizeUsingGroq(titles);
-
-    // Ensure the number of rewritten titles matches the number of original titles
-    if (rewrittenTitles.length !== titles.length) {
-      console.error('Mismatch between original and rewritten titles count.');
-      return newsList.map((news, index) => ({
-        index,
-        title: titles[index], // Fallback to original title if there is an error
-        content: news.news_obj.content,
-        imageUrl: encodeImageUrl(news.news_obj.image_url),
-        minNewsId,
-        hashId: news.news_obj.hash_id,
-        sourceUrl: news.news_obj.source_url
-      }));
-    }
-
-    // Map rewritten titles back to their respective fields
-    const newsData = newsList.map((news, index) => ({
+    newsData = newsList.map((news, index) => ({
       index,
-      title: rewrittenTitles[index], // Properly map rewritten title
+      title: rewrittenTitles[index] || news.news_obj.title,
       content: news.news_obj.content,
       imageUrl: encodeImageUrl(news.news_obj.image_url),
       minNewsId,
       hashId: news.news_obj.hash_id,
       sourceUrl: news.news_obj.source_url
     }));
-
-    // Cache the result
     cache.set('news_data', newsData);
   } catch (error) {
-    console.error('Error fetching news data:', error);
+    // console.error('Error fetching news data:', error);
     newsData = [];
   }
 };
@@ -138,6 +118,7 @@ const getNews = (req, res) => {
       });
     }
   } catch (error) {
+    // console.error('Error sending news data:', error);
     res.status(500).json({ error: 'Failed to send data' });
   }
 };
@@ -146,36 +127,23 @@ const getMoreNews = async (req, res) => {
   try {
     const minNewsId = req.body.minNewsId;
     if (!minNewsId) return res.status(400).send('minNewsId is required');
-    const cacheKey = `news_more_${minNewsId}`;
+    const cacheKey = news_more_${minNewsId};
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
       const encryptedResponse = encryptJsonResponse(cachedData);
       return res.json({ encryptedData: encryptedResponse });
     }
 
-    const url = `${API_URL_BASE}&news_offset=${minNewsId}&cache_bust=${Date.now()}`;
+    const url = ${API_URL_BASE}&news_offset=${minNewsId}&cache_bust=${Date.now()};
     const response = await axios.get(url, { headers: { 'Cache-Control': 'no-store' } });
     const newsList = response.data.data.news_list;
     const newMinNewsId = response.data.data.min_news_id;
     const titles = newsList.map(news => news.news_obj.title);
     const rewrittenTitles = await summarizeUsingGroq(titles);
 
-    if (rewrittenTitles.length !== titles.length) {
-      console.error('Mismatch between original and rewritten titles count.');
-      return newsList.map((news, index) => ({
-        index,
-        title: titles[index], // Fallback to original title if there is an error
-        content: news.news_obj.content,
-        imageUrl: encodeImageUrl(news.news_obj.image_url),
-        minNewsId: newMinNewsId,
-        hashId: news.news_obj.hash_id,
-        sourceUrl: news.news_obj.source_url
-      }));
-    }
-
     const newsMoreData = newsList.map((news, index) => ({
       index,
-      title: rewrittenTitles[index],
+      title: rewrittenTitles[index] || news.news_obj.title,
       content: news.news_obj.content,
       imageUrl: encodeImageUrl(news.news_obj.image_url),
       minNewsId: newMinNewsId,
@@ -187,6 +155,7 @@ const getMoreNews = async (req, res) => {
     const encryptedResponse = encryptJsonResponse(newsMoreData);
     res.json({ encryptedData: encryptedResponse });
   } catch (error) {
+    // console.error('Error fetching more news:', error);
     res.status(500).json({ error: 'Failed to send data' });
   }
 };
@@ -207,6 +176,7 @@ const summarizeArticle = async (req, res) => {
     const response = await axios(options);
     const { full_text, title, img_url, summary } = response.data;
 
+    // Check if fullText or Title is empty or null
     if (!full_text || !title) {
       const errorMessage = { Title: 'There is no data available', fullText: 'There is no data available', imageUrl: '', summary: 'There is no data available' };
       const encryptedResponse = encryptJsonResponse(errorMessage);
@@ -226,24 +196,33 @@ const summarizeArticle = async (req, res) => {
     const encryptedResponse = encryptJsonResponse(articleData);
     res.json({ encryptedData: encryptedResponse });
   } catch (error) {
+    // console.error('Error summarizing article:', error);
     res.status(500).json({ error: 'Failed to summarize article' });
   }
 };
 
-app.get('/image-urls', (req, res) => {
+app.get('/image-urls', async (req, res) => {
   try {
-    const { url } = req.query;
-    const decodedUrl = decodeImageUrl(url);
-    res.redirect(decodedUrl);
+    const encodedUrl = req.query.url;
+    const url = decodeImageUrl(encodedUrl);
+    const response = await axios({
+      url,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    res.setHeader('Content-Type', response.headers['content-type']);
+    response.data.pipe(res);
   } catch (error) {
-    res.status(500).send('Error decoding image URL');
+    // console.error('Error fetching the image:', error);
+    res.status(500).send('Error fetching the image');
   }
 });
 
 app.get('/news', getNews);
 app.post('/news-more', getMoreNews);
-app.post('/summarize-article', summarizeArticle);
+app.post('/summarize', summarizeArticle);
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+//   console.log(Server is running on port ${PORT});
 });
